@@ -1,0 +1,7 @@
+-saldo, conseguir adicionar mais saldo fictício e esse saldo diminuir quando entro na partida, se ganhar o premio somar nela 
+
+- quando alguém ganhar a rodada aparecer e ir pra próxima cartela
+
+- ajustar o ultimo numero que sai
+
+Resto ir vendo amanhã...
