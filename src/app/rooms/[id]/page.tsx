@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -56,6 +56,8 @@ export default function RoomPage() {
     userName: string;
     pattern: string;
   } | null>(null);
+  const [userBalance, setUserBalance] = useState(0);
+  const isFetchingRef = React.useRef(false);
 
   // Redirecionamento se não estiver autenticado
   useEffect(() => {
@@ -64,22 +66,28 @@ export default function RoomPage() {
     }
   }, [status, router]);
 
-  // Função para buscar dados da sala
-  const fetchRoomData = async () => {
-    if (status !== "authenticated" || !id) return;
-
+  // Função para buscar dados da sala - agora definida fora dos useEffect como uma função do componente
+  const fetchRoomData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
-      const response = await fetch(`/api/rooms/${id}`);
+      if (status !== "authenticated" || !id) return;
 
-      if (!response.ok) {
-        throw new Error("Falha ao carregar dados da sala");
+      // Buscar dados da sala
+      const response = await fetch(`/api/rooms/${id}`);
+      if (!response.ok) throw new Error("Falha ao carregar dados da sala");
+      const data = await response.json();
+
+      // Buscar saldo atualizado
+      const balanceResponse = await fetch("/api/balance");
+      if (balanceResponse.ok) {
+        const balanceData = await balanceResponse.json();
+        setUserBalance(balanceData.balance);
       }
 
-      const data = await response.json();
       setRoom(data.room);
       setParticipants(data.participants);
       setIsHost(data.room.hostId === session?.user?.id);
-
       if (data.cards && data.cards.length > 0) {
         setCards(
           data.cards.map((card: any) => ({
@@ -89,26 +97,25 @@ export default function RoomPage() {
           }))
         );
       }
-
       if (data.currentRound) {
         setCurrentRound(data.currentRound.number);
         setDrawnNumbers(JSON.parse(data.currentRound.drawnNumbers));
-
         if (data.currentRound.status === "active") {
           setGameInProgress(true);
         }
       }
     } catch (err: any) {
-      setError(err.message);
+      console.error("Erro ao buscar dados da sala:", err);
     } finally {
+      isFetchingRef.current = false;
       setIsLoading(false);
     }
-  };
+  }, [id, status, session?.user?.id]);
 
   // Carregar dados da sala inicialmente
   useEffect(() => {
     fetchRoomData();
-  }, [id, status, session?.user?.id]);
+  }, [id, status, session?.user?.id, fetchRoomData]);
 
   // Inicializar socket
   useEffect(() => {
@@ -371,12 +378,18 @@ export default function RoomPage() {
               Código: <span className="font-mono font-bold">{room.code}</span>
             </p>
           </div>
-          <Link
-            href="/dashboard"
-            className="px-3 py-1 rounded border border-white text-sm hover:bg-blue-700 transition-colors"
-          >
-            Sair da Sala
-          </Link>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <p className="text-sm">Seu Saldo:</p>
+              <p className="font-bold">R$ {userBalance.toFixed(2)}</p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="px-3 py-1 rounded border border-white text-sm hover:bg-blue-700 transition-colors"
+            >
+              Sair da Sala
+            </Link>
+          </div>
         </div>
       </header>
 
